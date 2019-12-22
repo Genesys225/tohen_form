@@ -1,23 +1,59 @@
 import { LitElement, html, css } from "lit-element";
 import { popFactory } from "./popOver";
 import { createMachine, interpret, assign } from "@xstate/fsm";
-/** @typedef {import("../node_modules/@xstate/fsm/dist/types").Typestate } ctx */
+const actions = {
+  initiateInputMachine({ currentInput, state }) {
+    const focusedInput = state[currentInput];
+    if (!focusedInput.visited)
+      focusedInput.inputStateMachine = createMachine({
+        id: "inputStateMachine",
+        initial: "idle",
+        context: {
+          currentInput: null
+        },
+        states: {}
+      });
+    focusedInput.visited = true;
+
+    focusedInput;
+  },
+  syncContext(context, event) {
+    console.log(context, event);
+  }
+};
+/** @typedef {import("../node_modules/@xstate/fsm/dist/types").EventObject } EventObject */
 /** @typedef {import("../node_modules/@xstate/fsm/dist/types").StateMachine.Machine } formStateMachine */
 const formStateMachine = createMachine({
   id: "formStateMachine",
   initial: "idle",
-  context: { focused: false },
+  context: {
+    focused: false,
+    currentInput: null,
+    submitFailedValidation: false,
+    shouldValidate: true,
+    shouldValidationPop: true,
+    validationType: "tippy"
+  },
   states: {
-    idle: { on: { SLOTTED: "initiated" } },
+    idle: {
+      on: {
+        SLOTTED: {
+          target: "initiated",
+          actions: { type: actions.syncContext.name, exec: actions.syncContext }
+        }
+      }
+    },
     initiated: { on: { FOCUS: "inputFocused" } },
     inputFocused: {
       on: {
         FOCUS: {
           target: "inputFocused",
           actions: assign({
-            /** @param {TContext} context */
+            /** @param {Object} context * @param {EventObject} event */
             focused: (context, event) => {
+              if (event.currentInput) context.currentInput = event.currentInput;
               console.log("keep focusing", context, event);
+              actions.initiateInputMachine(event);
               return true;
             }
           })
@@ -42,32 +78,43 @@ class Tofes extends LitElement {
       state: { type: Object },
       showSubmit: { type: Boolean, reflect: true },
       confirmText: { type: String, reflect: true },
+      disableValidation: { type: Boolean },
+      tippyValidationPop: { type: Boolean },
+      validateBeforeSubmit: { type: Boolean },
+      customValidationStyle: { type: Object },
       name: { type: String, reflect: true, attribute: true },
       form: { attribute: false }
     };
+  }
+
+  static setState(newState) {
+    this.state = newState(this.state);
+    return this.state;
   }
 
   constructor() {
     super();
     this._internals = this.attachInternals();
     this.state = {};
+    this.disableValidation = false;
+    this.tippyValidationPop = true;
+    this.validateBeforeSubmit = false;
     this.showSubmit = true;
     this.confirmText = "Submit";
     this.name = this.getAttribute("name");
     this.form = {};
     this.formStateService = interpret(formStateMachine).start();
     this.formStateService.subscribe(state => {
-      console.log(state.value, state.context);
+      console.log(state.value, state.context, state.changed);
       state.matches("initiated") && console.log("initiated");
     });
   }
 
   slotPopulated() {
-    this.submitEvent = new Event("submit");
     /** @type {HTMLFormElement} */
     const shadowForm = this.shadowRoot.children[this.name];
     this.form = shadowForm;
-    this.form.noValidate = false;
+    this.form.noValidate = true;
     let slots = [...this.shadowRoot.querySelectorAll("slot")];
     slots.forEach(slot => {
       let nodes = slot.assignedNodes();
@@ -81,12 +128,19 @@ class Tofes extends LitElement {
         };
         input.required = true;
         input.addEventListener("input", e => this.formValueUpdated(e, this));
-        input.addEventListener("focus", () =>
-          this.formStateService.send("FOCUS")
+        input.addEventListener("focus", e =>
+          this.formStateService.send({
+            type: "FOCUS",
+            currentInput: e.target.name,
+            state: this.state
+          })
         );
         this.form.prepend(input);
       });
-      this.formStateService.send("SLOTTED");
+      this.formStateService.send({
+        type: "SLOTTED",
+        config: Object.entries(this)
+      });
     });
   }
   /**
@@ -105,10 +159,7 @@ class Tofes extends LitElement {
         <slot name="input" @slotchange=${this.slotPopulated}></slot>
         ${showSubmit &&
           html`
-            <button
-              @click=${() => this.form.dispatchEvent(this.submitEvent)}
-              type="submit"
-            >
+            <button type="submit">
               ${confirmText}
             </button>
           `}
@@ -128,10 +179,11 @@ class Tofes extends LitElement {
   handleSubmit(e) {
     // if (!e.target.checkValidity()) {
     console.log(e.target);
+    e.stopImmediatePropagation();
     e.preventDefault();
-    for (let input in this.state) {
-      if (this.state[input].validity.valid);
-    }
+    // for (let input in this.state) {
+    //   if (this.state[input].validity.valid);
+    // }
 
     // }
     // e.target.reportValidity();

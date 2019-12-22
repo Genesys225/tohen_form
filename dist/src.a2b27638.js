@@ -9311,16 +9311,54 @@ function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { va
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
+const actions = {
+  initiateInputMachine({
+    currentInput,
+    state
+  }) {
+    const focusedInput = state[currentInput];
+    if (!focusedInput.visited) focusedInput.inputStateMachine = (0, _fsm.createMachine)({
+      id: "inputStateMachine",
+      initial: "idle",
+      context: {
+        currentInput: null
+      },
+      states: {}
+    });
+    focusedInput.visited = true;
+    focusedInput;
+  },
+
+  syncContext(context, event) {
+    console.log(context, event);
+  }
+
+};
+/** @typedef {import("../node_modules/@xstate/fsm/dist/types").EventObject } EventObject */
+
+/** @typedef {import("../node_modules/@xstate/fsm/dist/types").StateMachine.Machine } formStateMachine */
+
 const formStateMachine = (0, _fsm.createMachine)({
   id: "formStateMachine",
   initial: "idle",
   context: {
-    focused: false
+    focused: false,
+    currentInput: null,
+    submitFailedValidation: false,
+    shouldValidate: true,
+    shouldValidationPop: true,
+    validationType: "tippy"
   },
   states: {
     idle: {
       on: {
-        SLOTTED: "initiated"
+        SLOTTED: {
+          target: "initiated",
+          actions: {
+            type: actions.syncContext.name,
+            exec: actions.syncContext
+          }
+        }
       }
     },
     initiated: {
@@ -9333,8 +9371,11 @@ const formStateMachine = (0, _fsm.createMachine)({
         FOCUS: {
           target: "inputFocused",
           actions: (0, _fsm.assign)({
+            /** @param {Object} context * @param {EventObject} event */
             focused: (context, event) => {
+              if (event.currentInput) context.currentInput = event.currentInput;
               console.log("keep focusing", context, event);
+              actions.initiateInputMachine(event);
               return true;
             }
           })
@@ -9346,6 +9387,12 @@ const formStateMachine = (0, _fsm.createMachine)({
 const {
   initialState
 } = formStateMachine;
+/**
+ *
+ *
+ * @class Tofes
+ * @extends {LitElement}
+ */
 
 class Tofes extends _litElement.LitElement {
   static get properties() {
@@ -9361,6 +9408,18 @@ class Tofes extends _litElement.LitElement {
         type: String,
         reflect: true
       },
+      disableValidation: {
+        type: Boolean
+      },
+      tippyValidationPop: {
+        type: Boolean
+      },
+      validateBeforeSubmit: {
+        type: Boolean
+      },
+      customValidationStyle: {
+        type: Object
+      },
       name: {
         type: String,
         reflect: true,
@@ -9372,28 +9431,34 @@ class Tofes extends _litElement.LitElement {
     };
   }
 
+  static setState(newState) {
+    this.state = newState(this.state);
+    return this.state;
+  }
+
   constructor() {
     super();
     this._internals = this.attachInternals();
     this.state = {};
+    this.disableValidation = false;
+    this.tippyValidationPop = true;
+    this.validateBeforeSubmit = false;
     this.showSubmit = true;
     this.confirmText = "Submit";
     this.name = this.getAttribute("name");
     this.form = {};
     this.formStateService = (0, _fsm.interpret)(formStateMachine).start();
-    this.formStateService.subscribe((state, events) => {
-      console.log(state.value, state.context, events);
+    this.formStateService.subscribe(state => {
+      console.log(state.value, state.context, state.changed);
       state.matches("initiated") && console.log("initiated");
     });
   }
 
   slotPopulated() {
-    this.submitEvent = new Event("submit");
     /** @type {HTMLFormElement} */
-
     const shadowForm = this.shadowRoot.children[this.name];
     this.form = shadowForm;
-    this.form.noValidate = false;
+    this.form.noValidate = true;
     let slots = [...this.shadowRoot.querySelectorAll("slot")];
     slots.forEach(slot => {
       let nodes = slot.assignedNodes();
@@ -9407,10 +9472,17 @@ class Tofes extends _litElement.LitElement {
         });
         input.required = true;
         input.addEventListener("input", e => this.formValueUpdated(e, this));
-        input.addEventListener("focus", () => this.formStateService.send("FOCUS"));
+        input.addEventListener("focus", e => this.formStateService.send({
+          type: "FOCUS",
+          currentInput: e.target.name,
+          state: this.state
+        }));
         this.form.prepend(input);
       });
-      this.formStateService.send("SLOTTED");
+      this.formStateService.send({
+        type: "SLOTTED",
+        config: Object.entries(this)
+      });
     });
   }
   /**
@@ -9435,10 +9507,7 @@ class Tofes extends _litElement.LitElement {
       >
         <slot name="input" @slotchange=${this.slotPopulated}></slot>
         ${showSubmit && _litElement.html`
-            <button
-              @click=${() => this.form.dispatchEvent(this.submitEvent)}
-              type="submit"
-            >
+            <button type="submit">
               ${confirmText}
             </button>
           `}
@@ -9454,8 +9523,7 @@ class Tofes extends _litElement.LitElement {
     const {
       name
     } = e.target;
-    (0, _popOver.popFactory)(e.target);
-    objRoot.toggleService.send("TOGGLE");
+    (0, _popOver.popFactory)(e.target); // objRoot.toggleService.send("TOGGLE");
   }
   /** @param {Event} e */
 
@@ -9463,13 +9531,12 @@ class Tofes extends _litElement.LitElement {
   handleSubmit(e) {
     // if (!e.target.checkValidity()) {
     console.log(e.target);
-    e.preventDefault();
-
-    for (let input in this.state) {
-      if (this.state[input].validity.valid) ;
-    } // }
+    e.stopImmediatePropagation();
+    e.preventDefault(); // for (let input in this.state) {
+    //   if (this.state[input].validity.valid);
+    // }
+    // }
     // e.target.reportValidity();
-
   }
 
 }
@@ -9574,7 +9641,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "50346" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "58297" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};

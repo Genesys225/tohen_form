@@ -13,7 +13,6 @@ export const popFactory = (target, options = {}) => {
   if (typeof target === "string") {
     target = document.querySelector(target);
   }
-
   // @ts-ignore
   target.blur();
   const popper = tippy(target, {
