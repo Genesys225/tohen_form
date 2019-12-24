@@ -9326,11 +9326,16 @@ const actions = {
       states: {}
     });
     focusedInput.visited = true;
-    focusedInput;
   },
 
   syncContext(context, event) {
-    console.log(context, event);
+    const {
+      validationConfig
+    } = event;
+    const validationProps = Object.keys(context);
+    validationConfig.map(prop => [prop[0].split("_").join(""), prop[1]]).filter(prop => validationProps.includes(prop[0])).forEach(prop => {
+      context[prop[0]] = prop[1];
+    });
   }
 
 };
@@ -9345,19 +9350,19 @@ const formStateMachine = (0, _fsm.createMachine)({
     focused: false,
     currentInput: null,
     submitFailedValidation: false,
-    shouldValidate: true,
-    shouldValidationPop: true,
-    validationType: "tippy"
+    disableValidation: false,
+    tippyValidationPop: true,
+    validateBeforeSubmit: false
   },
   states: {
     idle: {
       on: {
         SLOTTED: {
           target: "initiated",
-          actions: {
+          actions: [{
             type: actions.syncContext.name,
             exec: actions.syncContext
-          }
+          }]
         }
       }
     },
@@ -9374,8 +9379,8 @@ const formStateMachine = (0, _fsm.createMachine)({
             /** @param {Object} context * @param {EventObject} event */
             focused: (context, event) => {
               if (event.currentInput) context.currentInput = event.currentInput;
-              console.log("keep focusing", context, event);
-              actions.initiateInputMachine(event);
+              console.log("keep focusing", context, event); // actions.initiateInputMachine(event);
+
               return true;
             }
           })
@@ -9481,14 +9486,10 @@ class Tofes extends _litElement.LitElement {
       });
       this.formStateService.send({
         type: "SLOTTED",
-        config: Object.entries(this)
+        validationConfig: Object.entries(this)
       });
     });
   }
-  /**
-   * @return
-   */
-
 
   render() {
     const {
