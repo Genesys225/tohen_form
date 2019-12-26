@@ -2,30 +2,94 @@ import { LitElement, html, css } from "lit-element";
 import { popFactory } from "./popOver";
 import { createMachine, interpret, assign } from "@xstate/fsm";
 import { popOverCss } from "./tippyStyles";
+
 const actions = {
-  syncContext(context, event) {
-    const { validationConfig } = event;
-    const validationProps = Object.keys(context);
-    validationConfig
-      .map(prop => [prop[0].split("_").join(""), prop[1]])
-      .filter(prop => validationProps.includes(prop[0]))
-      .forEach(prop => {
-        context[prop[0]] = prop[1];
+  initiateForm(_context, { tofes }) {
+    const { shadowRoot, state, form, handleFocus, handleInput, handleBlur } = tofes
+    const slots = [...shadowRoot.querySelectorAll("slot")];
+    slots.forEach(slot => {
+      const nodes = slot.assignedNodes();
+      /**@type {Array<HTMLInputElement>} */
+      const htmlInputs = nodes.filter(node => node.nodeName === "INPUT");
+      htmlInputs.forEach(input => {
+        tofes.state = {
+          ...state,
+          [input.name]: input
+        };
+        input.required = true;
+        input.addEventListener("input", handleInput.bind(tofes));
+        input.addEventListener("focus", handleFocus.bind(tofes));
+        input.addEventListener("blur", handleBlur.bind(tofes));
+        form.prepend(input);
       });
-  }, initiateInputMachine({ currentInput, state }) {
+    });
+  },
+
+  initiateInput({ currentInput, state }) {
     const focusedInput = state[currentInput];
     const inputStateMachine = createInputMachine(focusedInput)
     focusedInput.inputStateService = interpret(inputStateMachine).start()
   },
+
   validateInput({ context: { currentInput } }) {
     const { custumValidationFn } = currentInput
     const isValid = currentInput.checkValidity()
     const isCustomValid = custumValidationFn(currentInput) || null
     const { inputStateService } = currentInput
+    debugger
     if ((isCustomValid === null || isCustomValid) && isValid) {
       inputStateService.send("VALID")
     } else inputStateService.send("INVALID")
   }
+}
+
+const createFormMachine = tofes => {
+  const {
+    submitFailedValidation,
+    disableValidation,
+    tippyValidationPop,
+    validateBeforeSubmit
+  } = tofes;
+  return createMachine({
+    id: "formStateMachine",
+    initial: "idle",
+    context: {
+      focused: false,
+      currentInput: null,
+      submitFailedValidation,
+      disableValidation,
+      tippyValidationPop,
+      validateBeforeSubmit
+    },
+    states: {
+      idle: {
+        on: {
+          // @ts-ignore
+          SLOTTED: {
+            target: "initiated",
+            actions: [
+              { type: actions.initiateForm.name, exec: actions.initiateForm }
+            ]
+          }
+        }
+      },
+      initiated: { on: { FOCUS: "inputFocused" } },
+      inputFocused: {
+        on: {
+          FOCUS: {
+            target: "inputFocused",
+            actions: assign({
+              /** @param {Object} context * @param {EventObject} event */
+              focused: (_context, event) => {
+                // actions.initiateInput(event);
+                return event.currentInput;
+              }
+            })
+          }
+        }
+      }
+    }
+  })
 }
 
 const createInputMachine = focusedInput => createMachine({
@@ -38,9 +102,10 @@ const createInputMachine = focusedInput => createMachine({
   states: {
     focused: {
       on: {
+        // @ts-ignore
         INPUT: {
           target: "validating",
-          actions: { type: actions.validateInput.name, exec: actions.syncContext }
+          actions: { type: actions.validateInput.name, exec: actions.validateInput }
         }
       }
     },
@@ -53,7 +118,7 @@ const createInputMachine = focusedInput => createMachine({
     },
     invalid: {
       on: {
-        INPUT: "validatingF"
+        INPUT: "validating"
       }
 
     },
@@ -65,51 +130,8 @@ const createInputMachine = focusedInput => createMachine({
 
 /** @typedef {import("../node_modules/@xstate/fsm/dist/types").EventObject } EventObject */
 /** @typedef {import("../node_modules/@xstate/fsm/dist/types").StateMachine.Machine } formStateMachine */
-const formStateMachine = createMachine({
-  id: "formStateMachine",
-  initial: "idle",
-  context: {
-    focused: false,
-    currentInput: null,
-    submitFailedValidation: false,
-    disableValidation: false,
-    tippyValidationPop: true,
-    validateBeforeSubmit: false
-  },
-  states: {
-    idle: {
-      on: {
-        SLOTTED: {
-          target: "initiated",
-          actions: [
-            { type: actions.syncContext.name, exec: actions.syncContext }
-          ]
-        }
-      }
-    },
-    initiated: { on: { FOCUS: "inputFocused" } },
-    inputFocused: {
-      on: {
-        FOCUS: {
-          target: "inputFocused",
-          actions: assign({
-            /** @param {Object} context * @param {EventObject} event */
-            focused: (context, event) => {
-              context.currentInput = event.currentInput;
-              console.log("keep focusing", context, event);
-              // actions.initiateInputMachine(event);
-              return true;
-            }
-          })
-        }
-      }
-    }
-  }
-});
 
 /**
- *
- *
  * @class Tofes
  * @extends {LitElement}
  */
@@ -126,7 +148,7 @@ class Tofes extends LitElement {
       validateBeforeSubmit: { type: Boolean },
       customValidationStyle: { type: Object },
       name: { type: String, reflect: true, attribute: true },
-      form: { attribute: false }
+      form: { type: Object }
     };
   }
 
@@ -141,10 +163,12 @@ class Tofes extends LitElement {
     this.disableValidation = false;
     this.tippyValidationPop = true;
     this.validateBeforeSubmit = false;
+    this.submitFailedValidation = false
     this.showSubmit = true;
     this.confirmText = "Submit";
+    this.form;
     this.name = this.getAttribute("name");
-    this.form = {};
+    const formStateMachine = createFormMachine(this)
     this.formStateService = interpret(formStateMachine).start();
     this.formStateService.subscribe(state => {
       console.log(state.value, state.context, state.changed);
@@ -154,29 +178,11 @@ class Tofes extends LitElement {
 
   slotPopulated() {
     /** @type {HTMLFormElement} */
-    const shadowForm = this.shadowRoot.children[this.name];
-    this.form = shadowForm;
-    this.form.noValidate = true;
-    let slots = [...this.shadowRoot.querySelectorAll("slot")];
-    slots.forEach(slot => {
-      let nodes = slot.assignedNodes();
-      /**@type {Array<HTMLInputElement>} */
-      // @ts-ignore
-      let htmlInputs = nodes.filter(node => node.nodeName === "INPUT");
-      htmlInputs.map(input => {
-        this.state = {
-          ...this.state,
-          [input.name]: input
-        };
-        input.required = true;
-        input.addEventListener("input", this.formValueUpdated);
-        input.addEventListener("focus", this.handleFocus)
-        this.form.prepend(input);
-      });
-      this.formStateService.send({
-        type: "SLOTTED",
-        validationConfig: Object.entries(this)
-      });
+    this.form = this.shadowRoot.children[this.name];
+
+    this.formStateService.send({
+      type: "SLOTTED",
+      tofes: this
     });
   }
 
@@ -209,7 +215,11 @@ class Tofes extends LitElement {
     })
   }
 
-  formValueUpdated(e) {
+  handleBlur(e) {
+    console.log(e)
+  }
+
+  handleInput(e) {
     popFactory(e.target);
   }
 
