@@ -1,20 +1,8 @@
 import { LitElement, html, css } from "lit-element";
 import { popFactory } from "./popOver";
 import { createMachine, interpret, assign } from "@xstate/fsm";
+import { popOverCss } from "./tippyStyles";
 const actions = {
-  initiateInputMachine({ currentInput, state }) {
-    const focusedInput = state[currentInput];
-    if (!focusedInput.visited)
-      focusedInput.inputStateMachine = createMachine({
-        id: "inputStateMachine",
-        initial: "idle",
-        context: {
-          currentInput: null
-        },
-        states: {}
-      });
-    focusedInput.visited = true;
-  },
   syncContext(context, event) {
     const { validationConfig } = event;
     const validationProps = Object.keys(context);
@@ -24,8 +12,57 @@ const actions = {
       .forEach(prop => {
         context[prop[0]] = prop[1];
       });
+  }, initiateInputMachine({ currentInput, state }) {
+    const focusedInput = state[currentInput];
+    const inputStateMachine = createInputMachine(focusedInput)
+    focusedInput.inputStateService = interpret(inputStateMachine).start()
+  },
+  validateInput({ context: { currentInput } }) {
+    const { custumValidationFn } = currentInput
+    const isValid = currentInput.checkValidity()
+    const isCustomValid = custumValidationFn(currentInput) || null
+    const { inputStateService } = currentInput
+    if ((isCustomValid === null || isCustomValid) && isValid) {
+      inputStateService.send("VALID")
+    } else inputStateService.send("INVALID")
   }
-};
+}
+
+const createInputMachine = focusedInput => createMachine({
+  id: "inputStateMachine",
+  initial: "focused",
+  context: {
+    currentInput: focusedInput,
+    custumValidationFn: focusedInput.custumValidationFn
+  },
+  states: {
+    focused: {
+      on: {
+        INPUT: {
+          target: "validating",
+          actions: { type: actions.validateInput.name, exec: actions.syncContext }
+        }
+      }
+    },
+    validating: {
+      on: {
+        VALID: "valid",
+        INVALID: "invalid",
+        INPUT: "validating"
+      }
+    },
+    invalid: {
+      on: {
+        INPUT: "validatingF"
+      }
+
+    },
+    valid: {
+
+    }
+  }
+});
+
 /** @typedef {import("../node_modules/@xstate/fsm/dist/types").EventObject } EventObject */
 /** @typedef {import("../node_modules/@xstate/fsm/dist/types").StateMachine.Machine } formStateMachine */
 const formStateMachine = createMachine({
@@ -58,7 +95,7 @@ const formStateMachine = createMachine({
           actions: assign({
             /** @param {Object} context * @param {EventObject} event */
             focused: (context, event) => {
-              if (event.currentInput) context.currentInput = event.currentInput;
+              context.currentInput = event.currentInput;
               console.log("keep focusing", context, event);
               // actions.initiateInputMachine(event);
               return true;
@@ -70,7 +107,6 @@ const formStateMachine = createMachine({
   }
 });
 
-const { initialState } = formStateMachine;
 /**
  *
  *
@@ -101,7 +137,6 @@ class Tofes extends LitElement {
 
   constructor() {
     super();
-    this._internals = this.attachInternals();
     this.state = {};
     this.disableValidation = false;
     this.tippyValidationPop = true;
@@ -113,7 +148,7 @@ class Tofes extends LitElement {
     this.formStateService = interpret(formStateMachine).start();
     this.formStateService.subscribe(state => {
       console.log(state.value, state.context, state.changed);
-      state.matches("initiated") && console.log("initiated");
+      state.matches("inputFocused") && console.log("inputFocused");
     });
   }
 
@@ -134,14 +169,8 @@ class Tofes extends LitElement {
           [input.name]: input
         };
         input.required = true;
-        input.addEventListener("input", e => this.formValueUpdated(e, this));
-        input.addEventListener("focus", e =>
-          this.formStateService.send({
-            type: "FOCUS",
-            currentInput: e.target.name,
-            state: this.state
-          })
-        );
+        input.addEventListener("input", this.formValueUpdated);
+        input.addEventListener("focus", this.handleFocus)
         this.form.prepend(input);
       });
       this.formStateService.send({
@@ -163,7 +192,7 @@ class Tofes extends LitElement {
       >
         <slot name="input" @slotchange=${this.slotPopulated}></slot>
         ${showSubmit &&
-          html`
+      html`
             <button type="submit">
               ${confirmText}
             </button>
@@ -171,97 +200,28 @@ class Tofes extends LitElement {
       </form>
     `;
   }
-  /** @param {Event} e * @param {Tofes} objRoot */
-  formValueUpdated(e, objRoot) {
-    /** @type {HTMLInputElement} */
-    // @ts-ignore
-    const { name } = e.target;
-    popFactory(e.target);
 
-    // objRoot.toggleService.send("TOGGLE");
+  handleFocus(e) {
+    this.formStateService.send({
+      type: "FOCUS",
+      currentInput: e.target.name,
+      state: this.state
+    })
   }
+
+  formValueUpdated(e) {
+    popFactory(e.target);
+  }
+
   /** @param {Event} e */
   handleSubmit(e) {
-    // if (!e.target.checkValidity()) {
     console.log(e.target);
     e.stopImmediatePropagation();
     e.preventDefault();
-    // for (let input in this.state) {
-    //   if (this.state[input].validity.valid);
-    // }
-
-    // }
-    // e.target.reportValidity();
   }
+
 }
 
 customElements.define("tohen-tofes", Tofes);
-const popOverCss = html`
-  <style>
-    .tippy-tooltip[data-animation="fade"][data-state="hidden"] {
-      opacity: 0;
-    }
-    .tippy-iOS {
-      cursor: pointer !important;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .tippy-popper {
-      pointer-events: none;
-      max-width: calc(100vw - 10px);
-      transition-timing-function: cubic-bezier(0.165, 0.84, 0.44, 1);
-      transition-property: transform;
-    }
-    .tippy-tooltip {
-      position: relative;
-      color: #fff;
-      border-radius: 4px;
-      font-size: 14px;
-      line-height: 1.4;
-      background-color: #333;
-      transition-property: visibility, opacity, transform;
-      outline: 0;
-    }
-    .tippy-tooltip[data-placement^="top"] > .tippy-arrow {
-      border-width: 8px 8px 0;
-      border-top-color: #333;
-      margin: 0 3px;
-      transform-origin: 50% 0;
-      bottom: -7px;
-    }
-    .tippy-tooltip[data-placement^="bottom"] > .tippy-arrow {
-      border-width: 0 8px 8px;
-      border-bottom-color: #333;
-      margin: 0 3px;
-      transform-origin: 50% 7px;
-      top: -7px;
-    }
-    .tippy-tooltip[data-placement^="left"] > .tippy-arrow {
-      border-width: 8px 0 8px 8px;
-      border-left-color: #333;
-      margin: 3px 0;
-      transform-origin: 0 50%;
-      right: -7px;
-    }
-    .tippy-tooltip[data-placement^="right"] > .tippy-arrow {
-      border-width: 8px 8px 8px 0;
-      border-right-color: #333;
-      margin: 3px 0;
-      transform-origin: 7px 50%;
-      left: -7px;
-    }
-    .tippy-tooltip[data-interactive][data-state="visible"] {
-      pointer-events: auto;
-    }
-    .tippy-tooltip[data-inertia][data-state="visible"] {
-      transition-timing-function: cubic-bezier(0.54, 1.5, 0.38, 1.11);
-    }
-    .tippy-arrow {
-      position: absolute;
-      border-color: transparent;
-      border-style: solid;
-    }
-    .tippy-content {
-      padding: 5px 9px;
-    }
-  </style>
-`;
+
+
