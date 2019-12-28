@@ -14,11 +14,12 @@
     "@polymer/lit-element": "^0.7.1",
     "@webcomponents/template": "^1.4.1",
     "@webcomponents/webcomponentsjs": "^2.4.0",
-    "@xstate/fsm": "1.1.0",
+    "@xstate/fsm": "^1.1.0",
     "custom-elements-es5-adapter": "^1.0.0",
     "lit-element": "^2.2.1",
     "lit-html": "^1.1.2",
-    "tippy.js": "^5.1.2"
+    "tippy.js": "^5.1.2",
+    "xstate": "^4.7.3"
   },
   "devDependencies": {
     "@babel/core": "^7.7.5",

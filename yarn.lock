@@ -874,7 +874,7 @@
   resolved "https://registry.yarnpkg.com/@webcomponents/webcomponentsjs/-/webcomponentsjs-2.4.0.tgz#e9dd031d24c234eff8824f7560e5c0c605d3d6a0"
   integrity sha512-kEClEz2nu9/i6SvyBJTV4pCc6CyCzMhK7zEeJ6QhiJoulBp4YZ06Zfj2E2HUXfWfHJIjtKriJYMtfhettKEjEg==
 
-"@xstate/fsm@1.1.0":
+"@xstate/fsm@^1.1.0":
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/@xstate/fsm/-/fsm-1.1.0.tgz#eabfa5e7647c59ede03f7be6d426741b5b2774c5"
   integrity sha512-60uPWa8L0tsi15bLbz+g5hVAsqxZ5C5GhfdsCccrYzNRlBLNuBQQPHX1n/HEsWJsz8JUiYfW/eefh8r/25sKgA==
@@ -5727,6 +5727,11 @@ xmlchars@^2.1.1:
   version "2.2.0"
   resolved "https://registry.yarnpkg.com/xmlchars/-/xmlchars-2.2.0.tgz#060fe1bcb7f9c76fe2a17db86a9bc3ab894210cb"
   integrity sha512-JZnDKK8B0RCDw84FNdDAIpZK+JuJw+s7Lz8nksI7SIuU3UXJJslUthsi+uWBUYOwPFwW7W7PRLRfUKpxjtjFCw==
+
+xstate@^4.7.3:
+  version "4.7.3"
+  resolved "https://registry.yarnpkg.com/xstate/-/xstate-4.7.3.tgz#61d36c5f85609ab1e354c72fbaedf38d57525b69"
+  integrity sha512-+1KyOB2JTv4kQQlZnEiDxSpEaIJnqslMa/479sc1KU3NMRP0caIV3p55Sr27GFS1EXQvnJ+n84bnWx77qplDWg==
 
 xtend@^4.0.0, xtend@~4.0.1:
   version "4.0.2"
