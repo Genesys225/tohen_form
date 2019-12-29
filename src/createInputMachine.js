@@ -5,7 +5,7 @@ export const validity = {
 	invalid: "invalid"
 };
 export const createInputMachine = focusedInput => {
-	const { formStateService } = focusedInput;
+	const { formStateService, invalidationDelay } = focusedInput;
 	return createMachine({
 		id: `inputStateMachine${focusedInput.inputIndex}`,
 		initial: "idle",
@@ -14,6 +14,7 @@ export const createInputMachine = focusedInput => {
 			customValidationFn: focusedInput.customValidationFn || null,
 			currentValidity: "valid",
 			formStateService,
+			invalidationDelay,
 			blurred: true,
 			currentValidationTimer: null,
 			inputStateService: null
@@ -43,34 +44,17 @@ export const createInputMachine = focusedInput => {
 			validating: {
 				entry: [
 					assign({
-						currentValidity: ctx => {
-							if (actions.validateInput(ctx)) {
-								return "valid";
-							}
-							return "invalid";
-						}
+						currentValidity: ctx =>
+							actions.validateInput(ctx) ? "valid" : "invalid"
 					}),
 					{
-						type: "jumpToValidityState",
-						exec: (ctx, event) =>
-							ctx.currentValidity === "valid"
-								? ctx.inputStateService.send({
-										type: "VALID",
-										source: event.source
-								  })
-								: ctx.inputStateService.send({
-										type: "INVALID",
-										source: event.source
-								  })
+						type: actions.changeToValidityState.name,
+						exec: actions.changeToValidityState
 					},
 					console.trace
 				],
 				on: {
-					INPUT: {
-						target: "",
-						cond: () => false,
-						actions: console.trace
-					},
+					INPUT: "validating",
 					VALID: "valid",
 					INVALID: "invalid"
 				}
@@ -93,19 +77,20 @@ export const createInputMachine = focusedInput => {
 						target: "validating",
 						actions: (_, event) => (event.source = "valid")
 					},
-					FOCUS: "focus"
+					FOCUS: "focused",
+					BLUR: "valid"
 				}
 			},
 			blurred: {
-				entry: assign({
-					blurred: ctx => {
-						if (ctx.currentValidationDelay)
-							ctx.currentValidationDelay.exec();
-						else actions.validateInput(ctx);
-
-						return true;
+				entry: [
+					assign({
+						blurred: () => true
+					}),
+					{
+						type: actions.changeToValidityState.name,
+						exec: actions.changeToValidityState
 					}
-				}),
+				],
 				on: {
 					FOCUS: "focused"
 				}

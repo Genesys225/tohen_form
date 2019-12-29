@@ -34,24 +34,31 @@ class Tofes extends LitElement {
 		this.tippyValidationPop = true;
 		this.validateBeforeSubmit = false;
 		this.submitFailedValidation = false;
+		this.invalidationDelay = 2500;
 		this.showSubmit = true;
 		this.confirmText = "Submit";
 		this.form;
 		this.inputSubscribed = false;
-		this.inputsInitiated = false;
+		this.inputsInitialized = false;
 		this.name = this.getAttribute("name");
 		const formStateMachine = createFormMachine(this);
 		this.formStateService = interpret(formStateMachine).start();
 		this.formStateService.subscribe(console.trace);
 	}
 
-	slotPopulated() {
+	slotPopulated(e) {
 		/** @type {HTMLFormElement} */
 		this.form = this.shadowRoot.children[this.name];
-		this.formStateService.send({
-			type: "SLOTTED",
-			tofes: this
-		});
+		if (e.target.assignedNodes().length > 0)
+			this.formStateService.send({
+				type: "SLOTTED",
+				tofes: this
+			});
+		else
+			this.formStateService.send({
+				type: "INPUTS_OBTAINED",
+				tofes: this
+			});
 	}
 
 	render() {
@@ -76,55 +83,27 @@ class Tofes extends LitElement {
 	}
 
 	handleFocus(e) {
-		console.trace("FOCUS");
-
+		const currentInput = e.target;
+		const { inputStateService } = currentInput;
 		this.formStateService.send({
 			type: "FOCUS",
-			currentInput: e.target,
+			currentInput,
 			tofes: this
 		});
-		this.state[e.target.name].inputStateService.send({
+		inputStateService.send({
 			type: "FOCUS",
-			currentInput: e.target
+			currentInput
 		});
-		if (!this.state[e.target.name].inputSubscribed) {
-			this.state[e.target.name].inputSubscribed = true;
-			this.state[e.target.name].inputStateService.subscribe(state => {
-				// const { send } = this.formStateService;
-				// const { value, context: { currentValidity } } = state;
-				// const ctx = state.context;
-				// switch (value) {
-				// case "validating":
-				//     // ctx.currentValidity === 'valid' ?
-				//     //     ctx.currentInput.inputStateService.send({
-				//     //         type: 'VALID',
-				//     //         // source: event.source
-				//     //     }) :
-				//     //     ctx.currentInput.inputStateService.send({
-				//     //         type: 'INVALID',
-				//     //         // source: event.source
-				//     //     });
-				//     console.log(state);
-				//     break;
-				// case "invalid":
-				// case "valid":
-				//     // send({
-				//     //     type: 'VALIDITY_CHANGED',
-				//     //     currentValidity,
-				//     // });
-				//     break;
-
-				// default:
-				//     break;
-				// }
+		if (!currentInput.inputSubscribedTo) {
+			currentInput.inputSubscribedTo = true;
+			inputStateService.subscribe(state => {
 				console.trace(state.context.currentInput.name, state);
 			});
 		}
 	}
 
 	handleBlur(e) {
-		const { name } = e.target;
-		const { inputStateService } = this.state[name];
+		const { inputStateService } = e.target;
 		inputStateService &&
 			inputStateService.send({
 				type: "BLUR",
@@ -133,8 +112,7 @@ class Tofes extends LitElement {
 	}
 
 	handleInput(e) {
-		const { name } = e.target;
-		const { inputStateService } = this.state[name];
+		const { inputStateService } = e.target;
 		inputStateService &&
 			inputStateService.send({
 				type: "INPUT",

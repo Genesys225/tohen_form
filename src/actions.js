@@ -2,14 +2,15 @@ import { createInputMachine } from "./createInputMachine";
 import { interpret } from "@xstate/fsm";
 
 export const actions = {
-	initiateForm(context, { tofes }) {
+	initializeForm(context, { tofes }) {
 		const {
 			shadowRoot,
 			form,
 			handleFocus,
 			handleInput,
 			handleBlur,
-			formStateService
+			formStateService,
+			invalidationDelay
 		} = tofes;
 		context.formStateService = formStateService;
 		const slots = [...shadowRoot.querySelectorAll("slot")];
@@ -25,7 +26,8 @@ export const actions = {
 				Object.assign(input, {
 					formStateService,
 					required: true,
-					inputIndex: i
+					inputIndex: i,
+					invalidationDelay
 				});
 				input.addEventListener("input", handleInput.bind(tofes));
 				input.addEventListener("focus", handleFocus.bind(tofes));
@@ -35,7 +37,7 @@ export const actions = {
 		});
 	},
 
-	initiateInputs(context, event) {
+	initializeInputs(_context, event) {
 		const { tofes } = event;
 		tofes.setState(state => {
 			const inputNames = Object.keys(state);
@@ -44,13 +46,13 @@ export const actions = {
 				state[inputName].inputStateService = interpret(
 					inputStateMachine
 				).start();
-				state[inputName].initiated = true;
+				state[inputName].initialized = true;
 			});
 			return state;
 		});
 	},
 
-	validateInput(context) {
+	validateInput(context, event) {
 		const { customValidationFn, currentInput } = context;
 		const isValid = currentInput.checkValidity();
 		const isCustomValid =
@@ -58,17 +60,38 @@ export const actions = {
 		if ((isCustomValid === null || isCustomValid) && isValid) {
 			return true;
 		}
+		event.invalidationTrigger = isValid
+			? "customValidation"
+			: "nativeValidation";
 		return false;
-	},
-
-	delay(context) {
-		var promise = new Promise(function(resolve) {
-			context.currentValidationTimer = setTimeout(resolve, 2500, context);
-		});
-		return promise;
 	},
 
 	reportValidityChange({ formStateService, currentInput }, event) {
 		formStateService.send({ ...event, currentInput });
+	},
+
+	changeToValidityState(ctx, event) {
+		const { source } = event;
+		const isBlurred = source === "blurred";
+		const isValid = ctx.currentValidity === "valid";
+		const { send } = ctx.inputStateService;
+		const delay = isValid || isBlurred ? 0 : ctx.invalidationDelay;
+		setTimeout(
+			(event, ctx) => {
+				if (ctx.currentValidity === "valid")
+					send({
+						type: "VALID",
+						source: event.source
+					});
+				else
+					send({
+						type: "INVALID",
+						source: event.source
+					});
+			},
+			delay,
+			event,
+			ctx
+		);
 	}
 };

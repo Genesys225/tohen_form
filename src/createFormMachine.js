@@ -1,5 +1,5 @@
-import { actions } from "./actions";
 import { createMachine, assign } from "@xstate/fsm";
+import { actions } from "./actions";
 
 export default function createFormMachine(tofes) {
 	const {
@@ -19,9 +19,9 @@ export default function createFormMachine(tofes) {
 			disableValidation,
 			tippyValidationPop,
 			validateBeforeSubmit,
-			currentValidity: "valid",
+			currentValidity: "invalid",
 			formStateService: null,
-			inputsInitiated: false
+			inputsInitialized: false
 		},
 		states: {
 			idle: {
@@ -30,16 +30,17 @@ export default function createFormMachine(tofes) {
 						target: "formInitialized",
 						actions: [
 							{
-								type: actions.initiateForm.name,
-								exec: actions.initiateForm
-							}
+								type: actions.initializeForm.name,
+								exec: actions.initializeForm
+							},
+							console.trace
 						]
 					}
 				}
 			},
 			formInitialized: {
 				on: {
-					SLOTTED: "inputsInitialized"
+					INPUTS_OBTAINED: "inputsInitialized"
 				},
 				exit: [
 					assign({
@@ -47,11 +48,11 @@ export default function createFormMachine(tofes) {
 							event.tofes.state[event.currentInput]
 					}),
 					{
-						exec: actions.initiateInputs,
-						type: actions.initiateInputs.name
+						exec: actions.initializeInputs,
+						type: actions.initializeInputs.name
 					},
 					assign({
-						inputsInitiated: true
+						inputsInitialized: true
 					}),
 					assign({
 						formStateService: (_context, event) =>
@@ -64,7 +65,7 @@ export default function createFormMachine(tofes) {
 				entry: [
 					ctx =>
 						console.log(
-							ctx.inputsInitiated &&
+							ctx.inputsInitialized &&
 								"SUCCESSFULLY INITIALIZED INPUT MACHINES"
 						)
 				],
