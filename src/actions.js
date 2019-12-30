@@ -3,6 +3,7 @@ import { interpret } from "@xstate/fsm";
 
 export const actions = {
 	initializeForm(context, event) {
+		const { tofes } = event;
 		const {
       shadowRoot,
       form,
