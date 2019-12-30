@@ -2,16 +2,16 @@ import { createInputMachine } from "./createInputMachine";
 import { interpret } from "@xstate/fsm";
 
 export const actions = {
-	initializeForm(context, { tofes }) {
+	initializeForm(context, event) {
 		const {
-			shadowRoot,
-			form,
-			handleFocus,
-			handleInput,
-			handleBlur,
-			formStateService,
-			invalidationDelay
-		} = tofes;
+      shadowRoot,
+      form,
+      handleFocus,
+      handleInput,
+      handleBlur,
+      formStateService,
+      invalidationDelay
+    } = event.tofes;
 		context.formStateService = formStateService;
 		const slots = [...shadowRoot.querySelectorAll("slot")];
 		slots.forEach(slot => {
@@ -57,13 +57,21 @@ export const actions = {
 		const isValid = currentInput.checkValidity();
 		const isCustomValid =
 			customValidationFn && customValidationFn(currentInput);
-		if ((isCustomValid === null || isCustomValid) && isValid) {
-			return true;
+		const validationResult = (isCustomValid === null || (!isCustomValid || isCustomValid.error)) && isValid
+		if (validationResult) {
+      return "valid";
 		}
-		event.invalidationTrigger = isValid
-			? "customValidation"
-			: "nativeValidation";
-		return false;
+		const validityReport = isValid
+			? {
+					source: "customValidation",
+					isCustomValid
+				}
+			: {
+					source: "nativeValidation",
+					reason: currentInput.validity
+				};
+		event.invalidationTrigger = validityReport;
+		return "invalid";
 	},
 
 	reportValidityChange({ formStateService, currentInput }, event) {
@@ -78,15 +86,17 @@ export const actions = {
 		const delay = isValid || isBlurred ? 0 : ctx.invalidationDelay;
 		setTimeout(
 			(event, ctx) => {
+				const { source, invalidationTrigger } = event
 				if (ctx.currentValidity === "valid")
 					send({
 						type: "VALID",
-						source: event.source
+						source
 					});
 				else
 					send({
 						type: "INVALID",
-						source: event.source
+						source,
+						invalidationTrigger
 					});
 			},
 			delay,
