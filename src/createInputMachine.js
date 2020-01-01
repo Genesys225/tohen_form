@@ -47,9 +47,7 @@ export const createInputMachine = focusedInput => {
 			},
 			validating: {
 				entry: [
-					assign({
-						currentValidity: actions.validateInput
-					}),
+					assign({ currentValidity: actions.validateInput }),
 					actions.changeToValidityState,
 					console.trace
 				],
@@ -77,9 +75,7 @@ export const createInputMachine = focusedInput => {
 			},
 			blurred: {
 				entry: [
-					assign({
-						blurred: () => true
-					}),
+					assign({ blurred: true }),
 					actions.changeToValidityState
 				],
 				on: {

@@ -51,9 +51,7 @@ export default function createFormMachine(tofes) {
 						exec: actions.initializeInputs,
 						type: actions.initializeInputs.name
 					},
-					assign({
-						inputsInitialized: true
-					}),
+					assign({ inputsInitialized: true }),
 					assign({
 						formStateService: (_context, event) =>
 							event.tofes.formStateService
