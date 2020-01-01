@@ -2,59 +2,75 @@ import { createInputMachine } from "./createInputMachine";
 import { interpret } from "@xstate/fsm";
 import tippy, { hideAll } from "tippy.js";
 
+const changeToValidityState = (event, ctx) => {
+	const { send } = ctx.inputStateService;
+	const { source, validityReport } = event;
+	if (ctx.currentValidity === "valid")
+		send({
+			type: "VALID",
+			source
+		});
+	else
+		send({
+			type: "INVALID",
+			source,
+			validityReport
+		});
+};
+function initializeForm(input, i) {
+	const {
+		form,
+		handleFocus,
+		handleInput,
+		handleBlur,
+		formStateService,
+		invalidationDelay
+	} = this;
+	this.state = {
+		...this.state,
+		[input.name]: input
+	};
+	Object.assign(input, {
+		formStateService,
+		required: true,
+		inputIndex: i,
+		invalidationDelay
+	});
+	tippy(input, {
+		onCreate: console.log,
+		onShow(instance) {
+			hideAll();
+			/** @type {HTMLInputElement} reference */
+			// @ts-ignore
+			const { reference, setProps, setContent } = instance;
+			const { dataset } = reference;
+			const { validationMessage, arrow } = dataset;
+			arrow &&
+				setProps({
+					arrow
+				});
+			setContent(validationMessage);
+			if (!reference.validity.valid) return false;
+		},
+		trigger: "manual"
+	});
+	input.addEventListener("input", handleInput.bind(this));
+	input.addEventListener("focus", handleFocus.bind(this));
+	input.addEventListener("blur", handleBlur.bind(this));
+	form.prepend(input);
+}
+
 export const actions = {
 	initializeForm(context, event) {
 		const { tofes } = event;
-		const {
-			shadowRoot,
-			form,
-			handleFocus,
-			handleInput,
-			handleBlur,
-			formStateService,
-			invalidationDelay
-		} = tofes;
+		const { shadowRoot, formStateService } = tofes;
 		context.formStateService = formStateService;
 		const slots = [...shadowRoot.querySelectorAll("slot")];
 		slots.forEach(slot => {
 			const nodes = slot.assignedNodes();
 			/**@type {Array<HTMLInputElement>} */
 			const htmlInputs = nodes.filter(node => node.nodeName === "INPUT");
-			htmlInputs.forEach((input, i) => {
-				tofes.state = {
-					...tofes.state,
-					[input.name]: input
-				};
-				Object.assign(input, {
-					formStateService,
-					required: true,
-					inputIndex: i,
-					invalidationDelay
-				});
-				// @ts-ignore
-				tippy(input, {
-					onCreate: console.log,
-					onShow(instance) {
-						hideAll();
-						/** @type {HTMLInputElement} reference */
-						// @ts-ignore
-						const { reference, setProps, setContent } = instance;
-						const { dataset } = reference;
-						const { validationMessage, arrow } = dataset;
-						arrow &&
-							setProps({
-								arrow
-							});
-						setContent(validationMessage);
-						return !reference.validity.valid;
-					},
-					trigger: "manual"
-				});
-				input.addEventListener("input", handleInput.bind(tofes));
-				input.addEventListener("focus", handleFocus.bind(tofes));
-				input.addEventListener("blur", handleBlur.bind(tofes));
-				form.prepend(input);
-			});
+			htmlInputs.forEach(initializeForm, tofes);
 		});
 	},
 
@@ -117,26 +133,7 @@ export const actions = {
 		const { source } = event;
 		const isBlurred = source === "blurred" || source === "InvalidBlurred";
 		const isValid = ctx.currentValidity === "valid";
-		const { send } = ctx.inputStateService;
 		const delay = isValid || isBlurred ? 0 : ctx.invalidationDelay;
-		setTimeout(
-			(event, ctx) => {
-				const { source, validityReport } = event;
-				if (ctx.currentValidity === "valid")
-					send({
-						type: "VALID",
-						source
-					});
-				else
-					send({
-						type: "INVALID",
-						source,
-						validityReport
-					});
-			},
-			delay,
-			event,
-			ctx
-		);
+		setTimeout(changeToValidityState, delay, event, ctx);
 	}
 };
