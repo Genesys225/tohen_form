@@ -1,5 +1,4 @@
 import { LitElement, html } from "lit-element";
-// import { popFactory } from "./popOver";
 import { interpret } from "@xstate/fsm";
 import { popOverCss } from "./tippyStyles";
 import createFormMachine from "./createFormMachine";
@@ -118,7 +117,6 @@ class Tofes extends LitElement {
 				type: "INPUT",
 				currentInput: e.target.name
 			});
-		// popFactory(e.target);
 	}
 
 	/** @param {Event} e */

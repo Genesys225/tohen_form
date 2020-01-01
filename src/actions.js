@@ -1,18 +1,19 @@
 import { createInputMachine } from "./createInputMachine";
 import { interpret } from "@xstate/fsm";
+import tippy, { hideAll } from "tippy.js";
 
 export const actions = {
 	initializeForm(context, event) {
 		const { tofes } = event;
 		const {
-      shadowRoot,
-      form,
-      handleFocus,
-      handleInput,
-      handleBlur,
-      formStateService,
-      invalidationDelay
-    } = event.tofes;
+			shadowRoot,
+			form,
+			handleFocus,
+			handleInput,
+			handleBlur,
+			formStateService,
+			invalidationDelay
+		} = tofes;
 		context.formStateService = formStateService;
 		const slots = [...shadowRoot.querySelectorAll("slot")];
 		slots.forEach(slot => {
@@ -29,6 +30,25 @@ export const actions = {
 					required: true,
 					inputIndex: i,
 					invalidationDelay
+				});
+				// @ts-ignore
+				tippy(input, {
+					onCreate: console.log,
+					onShow(instance) {
+						hideAll();
+						/** @type {HTMLInputElement} reference */
+						// @ts-ignore
+						const { reference, setProps, setContent } = instance;
+						const { dataset } = reference;
+						const { validationMessage, arrow } = dataset;
+						arrow &&
+							setProps({
+								arrow
+							});
+						setContent(validationMessage);
+						return !reference.validity.valid;
+					},
+					trigger: "manual"
 				});
 				input.addEventListener("input", handleInput.bind(tofes));
 				input.addEventListener("focus", handleFocus.bind(tofes));
@@ -55,39 +75,53 @@ export const actions = {
 
 	validateInput(context, event) {
 		const { customValidationFn, currentInput } = context;
-		const isValid = currentInput.checkValidity();
-		const isCustomValid =
+		const isNativeValid = currentInput.checkValidity();
+		const customValidity =
 			customValidationFn && customValidationFn(currentInput);
-		const validationResult = (isCustomValid === null || (!isCustomValid || isCustomValid.error)) && isValid
-		if (validationResult) {
-      return "valid";
-		}
-		const validityReport = isValid
-			? {
-					source: "customValidation",
-					isCustomValid
-				}
-			: {
-					source: "nativeValidation",
-					reason: currentInput.validity
-				};
-		event.invalidationTrigger = validityReport;
+		const isCustomValid =
+			customValidity === null || !customValidity || customValidity.error;
+		const { validity } = currentInput;
+		if (isCustomValid && isNativeValid) return "valid";
+		event.validityReport = {
+			source: "nativeValidation",
+			validity
+		};
+		if (isNativeValid)
+			event.validityReport = {
+				source: "customValidation",
+				customValidity,
+				validity
+			};
 		return "invalid";
 	},
 
-	reportValidityChange({ formStateService, currentInput }, event) {
-		formStateService.send({ ...event, currentInput });
+	reportValidityChange: {
+		type: "reportValidityChange",
+		exec: ({ formStateService, currentInput }, event) => {
+			formStateService.send({ ...event, currentInput });
+		}
+	},
+
+	execValidationEffects: {
+		type: "execValidationEffects",
+		exec: (context, event) => {
+			const isValid = event.type === "VALID" ? true : false;
+			console.log(event);
+			const { currentInput } = context;
+			const { _tippy } = currentInput;
+			!isValid && _tippy.show();
+		}
 	},
 
 	changeToValidityState(ctx, event) {
 		const { source } = event;
-		const isBlurred = source === "blurred";
+		const isBlurred = source === "blurred" || source === "InvalidBlurred";
 		const isValid = ctx.currentValidity === "valid";
 		const { send } = ctx.inputStateService;
 		const delay = isValid || isBlurred ? 0 : ctx.invalidationDelay;
 		setTimeout(
 			(event, ctx) => {
-				const { source, invalidationTrigger } = event
+				const { source, validityReport } = event;
 				if (ctx.currentValidity === "valid")
 					send({
 						type: "VALID",
@@ -97,7 +131,7 @@ export const actions = {
 					send({
 						type: "INVALID",
 						source,
-						invalidationTrigger
+						validityReport
 					});
 			},
 			delay,
