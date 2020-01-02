@@ -103,27 +103,25 @@ class Tofes extends LitElement {
 
 	handleBlur(e) {
 		const { inputStateService } = e.target;
-		inputStateService &&
-			inputStateService.send({
-				type: "BLUR",
-				currentInput: e.target.name
-			});
+		inputStateService.send({
+			type: "BLUR",
+			currentInput: e.target.name
+		});
 	}
 
 	handleInput(e) {
 		const { inputStateService } = e.target;
-		inputStateService &&
-			inputStateService.send({
-				type: "INPUT",
-				currentInput: e.target.name
-			});
+		inputStateService.send({
+			type: "INPUT",
+			currentInput: e.target.name
+		});
 	}
 
 	/** @param {Event} e */
 	handleSubmit(e) {
-		console.trace(e.target);
 		e.stopImmediatePropagation();
 		e.preventDefault();
+		console.trace(e);
 	}
 }
 

@@ -2,7 +2,7 @@ import { createInputMachine } from "./createInputMachine";
 import { interpret } from "@xstate/fsm";
 import tippy, { hideAll } from "tippy.js";
 
-const changeToValidityState = (event, ctx) => {
+function changeToValidityState(event, ctx) {
 	const { send } = ctx.inputStateService;
 	const { source, validityReport } = event;
 	if (ctx.currentValidity === "valid")
@@ -16,7 +16,7 @@ const changeToValidityState = (event, ctx) => {
 			source,
 			validityReport
 		});
-};
+}
 function initializeForm(input, i) {
 	const {
 		form,
@@ -76,15 +76,17 @@ export const actions = {
 
 	initializeInputs(_context, event) {
 		const { tofes } = event;
+		tofes.form.noValidate = true;
 		tofes.setState(state => {
 			const inputNames = Object.keys(state);
-			inputNames.forEach(inputName => {
+			function setState(inputName) {
 				const inputStateMachine = createInputMachine(state[inputName]);
 				state[inputName].inputStateService = interpret(
 					inputStateMachine
 				).start();
 				state[inputName].initialized = true;
-			});
+			}
+			inputNames.forEach(setState);
 			return state;
 		});
 	},
@@ -98,29 +100,26 @@ export const actions = {
 			customValidity === null || !customValidity || customValidity.error;
 		const { validity } = currentInput;
 		if (isCustomValid && isNativeValid) return "valid";
+		const source = isNativeValid ? "nativeValidation" : "customValidation";
 		event.validityReport = {
-			source: "nativeValidation",
-			validity
+			source,
+			validity,
+			customValidity
 		};
-		if (isNativeValid)
-			event.validityReport = {
-				source: "customValidation",
-				customValidity,
-				validity
-			};
+
 		return "invalid";
 	},
 
 	reportValidityChange: {
 		type: "reportValidityChange",
-		exec: ({ formStateService, currentInput }, event) => {
+		exec({ formStateService, currentInput }, event) {
 			formStateService.send({ ...event, currentInput });
 		}
 	},
 
 	execValidationEffects: {
 		type: "execValidationEffects",
-		exec: (context, event) => {
+		exec(context, event) {
 			const isValid = event.type === "VALID" ? true : false;
 			console.log(event);
 			const { currentInput } = context;
@@ -129,11 +128,15 @@ export const actions = {
 		}
 	},
 
-	changeToValidityState(ctx, event) {
-		const { source } = event;
-		const isBlurred = source === "blurred" || source === "InvalidBlurred";
-		const isValid = ctx.currentValidity === "valid";
-		const delay = isValid || isBlurred ? 0 : ctx.invalidationDelay;
-		setTimeout(changeToValidityState, delay, event, ctx);
+	changeToValidityState: {
+		type: "changeToValidityState",
+		exec(ctx, event) {
+			const { source } = event;
+			const isBlurred =
+				source === "blurred" || source === "InvalidBlurred";
+			const isValid = ctx.currentValidity === "valid";
+			const delay = isValid || isBlurred ? 0 : ctx.invalidationDelay;
+			setTimeout(changeToValidityState, delay, event, ctx);
+		}
 	}
 };
