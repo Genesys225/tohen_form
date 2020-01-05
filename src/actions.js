@@ -31,6 +31,7 @@ function injectContext(conf) {
 	};
 }
 
+/** @typedef {HTMLInputElement} reference */
 function onShow(instance) {
 	const { reference, setProps, setContent } = instance;
 	const { displayMulti } = instance.props.context;
@@ -50,7 +51,6 @@ function onHide(instance) {
 	if (displayMulti && instance.reference.classList.contains("invalid"))
 		return false;
 }
-/** @typedef {HTMLInputElement} reference */
 
 function tippyConfig(conf) {
 	const tippyConfObj = {
