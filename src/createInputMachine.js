@@ -5,7 +5,7 @@ export const validity = {
 	invalid: "invalid"
 };
 
-export const createInputMachine = focusedInput => {
+export const createInputMachine = (focusedInput, displayMulti) => {
 	const transitions = {
 		validating: source => ({
 			target: "validating",
@@ -26,6 +26,7 @@ export const createInputMachine = focusedInput => {
 			formStateService,
 			invalidationDelay,
 			blurred: true,
+			displayMulti,
 			currentValidationTimer: null,
 			inputStateService: null
 		},
@@ -75,6 +76,7 @@ export const createInputMachine = focusedInput => {
 			},
 			blurred: {
 				entry: [
+					assign({ currentValidity: actions.validateInput }),
 					assign({ blurred: true }),
 					actions.changeToValidityState
 				],

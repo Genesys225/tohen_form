@@ -17,6 +17,35 @@ function changeToValidityState(event, ctx) {
 			validityReport
 		});
 }
+
+function tippyConfig(conf) {
+	const { displayMulti } = conf;
+	function onShow(instance) {
+		/** @type {HTMLInputElement} reference */
+		// @ts-ignore
+		const { reference, setProps, setContent } = instance;
+		const { dataset } = reference;
+		const { validationMessage, arrow } = dataset;
+		!displayMulti && hideAll();
+		arrow &&
+			setProps({
+				arrow
+			});
+		setContent(validationMessage);
+		if (reference.validity.valid) return false;
+	}
+	function onHide(instance) {
+		if (instance.reference.classList.contains("invalid")) return false;
+	}
+	const tippyConfObj = {
+		onCreate: console.log,
+		onShow,
+		onHide,
+		trigger: "manual"
+	};
+	return tippyConfObj;
+}
+
 function initializeForm(input, i) {
 	const {
 		form,
@@ -24,36 +53,23 @@ function initializeForm(input, i) {
 		handleInput,
 		handleBlur,
 		formStateService,
-		invalidationDelay
+		invalidationDelay,
+		displayMulti
 	} = this;
-	this.state = {
-		...this.state,
+
+	const tippyGlobalConf = { displayMulti };
+	this.setState(state => ({
+		...state,
 		[input.name]: input
-	};
+	}));
 	Object.assign(input, {
 		formStateService,
 		required: true,
 		inputIndex: i,
 		invalidationDelay
 	});
-	tippy(input, {
-		onCreate: console.log,
-		onShow(instance) {
-			hideAll();
-			/** @type {HTMLInputElement} reference */
-			// @ts-ignore
-			const { reference, setProps, setContent } = instance;
-			const { dataset } = reference;
-			const { validationMessage, arrow } = dataset;
-			arrow &&
-				setProps({
-					arrow
-				});
-			setContent(validationMessage);
-			if (!reference.validity.valid) return false;
-		},
-		trigger: "manual"
-	});
+	// @ts-ignore
+	tippy(input, tippyConfig(tippyGlobalConf));
 	input.addEventListener("input", handleInput.bind(this));
 	input.addEventListener("focus", handleFocus.bind(this));
 	input.addEventListener("blur", handleBlur.bind(this));
@@ -61,34 +77,66 @@ function initializeForm(input, i) {
 }
 
 export const actions = {
-	initializeForm(context, event) {
-		const { tofes } = event;
-		const { shadowRoot, formStateService } = tofes;
-		context.formStateService = formStateService;
-		const slots = [...shadowRoot.querySelectorAll("slot")];
-		slots.forEach(slot => {
-			const nodes = slot.assignedNodes();
-			/**@type {Array<HTMLInputElement>} */
-			const htmlInputs = nodes.filter(node => node.nodeName === "INPUT");
-			htmlInputs.forEach(initializeForm, tofes);
-		});
+	initializeForm: {
+		type: "initializeForm",
+		exec(context, event) {
+			const { tofes } = event;
+			const { shadowRoot, formStateService } = tofes;
+			context.formStateService = formStateService;
+			const slots = [...shadowRoot.querySelectorAll("slot")];
+			slots.forEach(slot => {
+				const nodes = slot.assignedNodes();
+				/**@type {Array<HTMLInputElement>} */
+				const htmlInputs = nodes.filter(
+					node => node.nodeName === "INPUT"
+				);
+				htmlInputs.forEach(initializeForm, tofes);
+			});
+		}
 	},
 
-	initializeInputs(_context, event) {
-		const { tofes } = event;
-		tofes.form.noValidate = true;
-		tofes.setState(state => {
-			const inputNames = Object.keys(state);
-			function setState(inputName) {
-				const inputStateMachine = createInputMachine(state[inputName]);
-				state[inputName].inputStateService = interpret(
-					inputStateMachine
-				).start();
-				state[inputName].initialized = true;
-			}
-			inputNames.forEach(setState);
-			return state;
-		});
+	initializeInputs: {
+		type: "initializeInputs",
+		exec(_context, event) {
+			const { tofes } = event;
+			tofes.form.noValidate = true;
+			tofes.setState(state => {
+				const inputNames = Object.keys(state);
+				function setState(inputName) {
+					const inputStateMachine = createInputMachine(
+						state[inputName],
+						tofes.displayMulti
+					);
+					state[inputName].inputStateService = interpret(
+						inputStateMachine
+					).start();
+					state[inputName].initialized = true;
+				}
+				inputNames.forEach(setState);
+				return state;
+			});
+		}
+	},
+
+	announceInitSuccess: {
+		type: "announceInitSuccess",
+		exec(ctx) {
+			console.log(
+				ctx.inputsInitialized &&
+					"SUCCESSFULLY INITIALIZED INPUT MACHINES"
+			);
+		}
+	},
+
+	updateFormValidity: {
+		type: "updateFormValidity",
+		exec: (ctx, event) => {
+			if (
+				ctx.currentValidity === "valid" &&
+				event.currentValidity === "invalid"
+			)
+				ctx.currentValidity = event.currentValidity;
+		}
 	},
 
 	validateInput(context, event) {
@@ -100,7 +148,7 @@ export const actions = {
 			customValidity === null || !customValidity || customValidity.error;
 		const { validity } = currentInput;
 		if (isCustomValid && isNativeValid) return "valid";
-		const source = isNativeValid ? "nativeValidation" : "customValidation";
+		const source = isNativeValid ? "customValidation" : "nativeValidation";
 		event.validityReport = {
 			source,
 			validity,
@@ -120,20 +168,36 @@ export const actions = {
 	execValidationEffects: {
 		type: "execValidationEffects",
 		exec(context, event) {
-			const isValid = event.type === "VALID" ? true : false;
-			console.log(event);
 			const { currentInput } = context;
 			const { _tippy } = currentInput;
-			!isValid && _tippy.show();
+			console.trace(event.type);
+			switch (event.type) {
+				case "VALID":
+					console.trace(_tippy);
+					currentInput.classList.add("valid");
+					currentInput.classList.remove("invalid");
+					_tippy.hide();
+					break;
+				case "INVALID":
+					currentInput.classList.remove("valid");
+					currentInput.classList.add("invalid");
+					_tippy.show();
+					break;
+
+				default:
+					_tippy.show();
+					console.trace(_tippy);
+					break;
+			}
 		}
 	},
 
 	changeToValidityState: {
 		type: "changeToValidityState",
 		exec(ctx, event) {
-			const { source } = event;
-			const isBlurred =
-				source === "blurred" || source === "InvalidBlurred";
+			const { type } = event;
+			console.log(event);
+			const isBlurred = type === "BLUR";
 			const isValid = ctx.currentValidity === "valid";
 			const delay = isValid || isBlurred ? 0 : ctx.invalidationDelay;
 			setTimeout(changeToValidityState, delay, event, ctx);

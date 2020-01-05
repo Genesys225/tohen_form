@@ -37,6 +37,7 @@ class Tofes extends LitElement {
 		this.showSubmit = true;
 		this.confirmText = "Submit";
 		this.form;
+		this.displayMulti = true;
 		this.inputSubscribed = false;
 		this.inputsInitialized = false;
 		this.name = this.getAttribute("name");

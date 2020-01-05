@@ -1,6 +1,9 @@
 import { createMachine, assign } from "@xstate/fsm";
 import { actions } from "./actions";
 
+function currentInput(context, event) {
+	return event.currentInput ? event.currentInput : context.currentInput;
+}
 export default function createFormMachine(tofes) {
 	const {
 		submitFailedValidation,
@@ -28,13 +31,7 @@ export default function createFormMachine(tofes) {
 				on: {
 					SLOTTED: {
 						target: "formInitialized",
-						actions: [
-							{
-								type: actions.initializeForm.name,
-								exec: actions.initializeForm
-							},
-							console.trace
-						]
+						actions: [actions.initializeForm, console.trace]
 					}
 				}
 			},
@@ -47,10 +44,7 @@ export default function createFormMachine(tofes) {
 						currentInput: (_context, event) =>
 							event.tofes.state[event.currentInput]
 					}),
-					{
-						exec: actions.initializeInputs,
-						type: actions.initializeInputs.name
-					},
+					actions.initializeInputs,
 					assign({ inputsInitialized: true }),
 					assign({
 						formStateService: (_context, event) =>
@@ -60,13 +54,7 @@ export default function createFormMachine(tofes) {
 				]
 			},
 			inputsInitialized: {
-				entry: [
-					ctx =>
-						console.log(
-							ctx.inputsInitialized &&
-								"SUCCESSFULLY INITIALIZED INPUT MACHINES"
-						)
-				],
+				entry: [actions.announceInitSuccess],
 				on: {
 					FOCUS: "inputFocused"
 				}
@@ -76,27 +64,13 @@ export default function createFormMachine(tofes) {
 					assign({
 						focused: true
 					}),
-					assign({
-						currentInput: (context, event) =>
-							event.currentInput
-								? event.currentInput
-								: context.currentInput
-					})
+					assign({ currentInput })
 				],
 				on: {
 					FOCUS: { target: "inputFocused" },
 					VALIDITY_CHANGED: {
 						target: "inputFocused",
-						actions: {
-							type: "updateFormValidity",
-							exec: (ctx, event) => {
-								if (
-									ctx.currentValidity === "valid" &&
-									event.currentValidity === "invalid"
-								)
-									ctx.currentValidity = event.currentValidity;
-							}
-						}
+						actions: actions.updateFormValidity
 					}
 				}
 			}
