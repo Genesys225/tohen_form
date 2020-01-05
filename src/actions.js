@@ -17,31 +17,48 @@ function changeToValidityState(event, ctx) {
 			validityReport
 		});
 }
+function injectContext(conf) {
+	return {
+		// Optional (if the plugin provides a prop to use)
+		name: "context", // e.g. 'followCursor' or 'sticky'
+		defaultValue: conf,
+
+		// Required
+		fn() {
+			// Internal state
+			return {};
+		}
+	};
+}
+
+function onShow(instance) {
+	const { reference, setProps, setContent } = instance;
+	const { displayMulti } = instance.props.context;
+	const { dataset } = reference;
+	const { validationMessage, arrow } = dataset;
+	!displayMulti && hideAll();
+	arrow &&
+		setProps({
+			arrow
+		});
+	setContent(validationMessage);
+	if (reference.validity.valid) return false;
+}
+
+function onHide(instance) {
+	const { displayMulti } = instance.props.context;
+	if (displayMulti && instance.reference.classList.contains("invalid"))
+		return false;
+}
+/** @typedef {HTMLInputElement} reference */
 
 function tippyConfig(conf) {
-	const { displayMulti } = conf;
-	function onShow(instance) {
-		/** @type {HTMLInputElement} reference */
-		// @ts-ignore
-		const { reference, setProps, setContent } = instance;
-		const { dataset } = reference;
-		const { validationMessage, arrow } = dataset;
-		!displayMulti && hideAll();
-		arrow &&
-			setProps({
-				arrow
-			});
-		setContent(validationMessage);
-		if (reference.validity.valid) return false;
-	}
-	function onHide(instance) {
-		if (instance.reference.classList.contains("invalid")) return false;
-	}
 	const tippyConfObj = {
 		onCreate: console.log,
 		onShow,
 		onHide,
-		trigger: "manual"
+		trigger: "manual",
+		plugins: [injectContext(conf)]
 	};
 	return tippyConfObj;
 }
