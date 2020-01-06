@@ -1,7 +1,7 @@
 import { LitElement, html } from "lit-element";
 import { interpret } from "@xstate/fsm";
 import { popOverCss } from "./tippyStyles";
-import createFormMachine from "./createFormMachine";
+import createFormMachine from "./state_machine/createFormMachine";
 
 /**
  * @class Tofes
