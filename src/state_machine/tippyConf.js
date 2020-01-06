@@ -1,15 +1,9 @@
 import { hideAll } from "tippy.js";
 function injectContext(conf) {
 	return {
-		// Optional (if the plugin provides a prop to use)
-		name: "context", // e.g. 'followCursor' or 'sticky'
+		name: "context",
 		defaultValue: conf,
-
-		// Required
-		fn() {
-			// Internal state
-			return {};
-		}
+		fn: () => ({})
 	};
 }
 

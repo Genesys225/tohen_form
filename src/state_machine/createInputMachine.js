@@ -1,5 +1,5 @@
 import { createMachine, assign } from "@xstate/fsm";
-import { actions } from "./actions";
+import { actions } from "./inputActions";
 export const validity = {
 	valid: "valid",
 	invalid: "invalid"
@@ -9,10 +9,10 @@ export const createInputMachine = (focusedInput, displayMulti) => {
 	const transitions = {
 		validating: source => ({
 			target: "validating",
-			actions: (_actions, event) => (event.source = source)
+			actions: (_context, event) => (event.source = source)
 		})
 	};
-	const inputStateService = (_actions, event) =>
+	const inputStateService = (_context, event) =>
 		event.currentInput.inputStateService;
 
 	const { formStateService, invalidationDelay } = focusedInput;
@@ -37,10 +37,7 @@ export const createInputMachine = (focusedInput, displayMulti) => {
 				}
 			},
 			focused: {
-				entry: [
-					assign({ blurred: false }),
-					assign({ inputStateService })
-				],
+				entry: [assign({ blurred: false, inputStateService })],
 				on: {
 					INPUT: transitions.validating("focused"),
 					BLUR: "blurred"
@@ -50,7 +47,7 @@ export const createInputMachine = (focusedInput, displayMulti) => {
 				entry: [
 					assign({ currentValidity: actions.validateInput }),
 					actions.changeToValidityState,
-					console.trace
+					console.log
 				],
 				on: {
 					INPUT: "validating",
@@ -76,9 +73,12 @@ export const createInputMachine = (focusedInput, displayMulti) => {
 			},
 			blurred: {
 				entry: [
-					assign({ currentValidity: actions.validateInput }),
-					assign({ blurred: true }),
-					actions.changeToValidityState
+					assign({
+						currentValidity: actions.validateInput,
+						blurred: true
+					}),
+					actions.changeToValidityState,
+					console.log
 				],
 				on: {
 					FOCUS: "focused",
@@ -87,7 +87,7 @@ export const createInputMachine = (focusedInput, displayMulti) => {
 				}
 			},
 			InvalidBlurred: {
-				entry: actions.execValidationEffects,
+				entry: [actions.execValidationEffects, console.log],
 				on: {
 					FOCUS: "focused",
 					INPUT: transitions.validating("InvalidBlurred")

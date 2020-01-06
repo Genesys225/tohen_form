@@ -1,5 +1,5 @@
 import { createMachine, assign } from "@xstate/fsm";
-import { actions } from "./actions";
+import { actions } from "./formActions";
 
 function currentInput(context, event) {
 	return event.currentInput ? event.currentInput : context.currentInput;
@@ -28,44 +28,29 @@ export default function createFormMachine(tofes) {
 		},
 		states: {
 			idle: {
-				on: {
-					SLOTTED: {
-						target: "formInitialized",
-						actions: [actions.initializeForm, console.trace]
-					}
-				}
+				on: { SLOTTED: "formInitialized" },
+				exit: [actions.initializeForm, console.trace]
 			},
 			formInitialized: {
-				on: {
-					INPUTS_OBTAINED: "inputsInitialized"
-				},
+				on: { INPUTS_OBTAINED: "inputsInitialized" },
 				exit: [
 					assign({
+						inputsInitialized: true,
 						currentInput: (_context, event) =>
-							event.tofes.state[event.currentInput]
-					}),
-					actions.initializeInputs,
-					assign({ inputsInitialized: true }),
-					assign({
+							event.tofes.state[event.currentInput],
 						formStateService: (_context, event) =>
 							event.tofes.formStateService
 					}),
+					actions.initializeInputs,
 					console.trace
 				]
 			},
 			inputsInitialized: {
 				entry: [actions.announceInitSuccess],
-				on: {
-					FOCUS: "inputFocused"
-				}
+				on: { FOCUS: "inputFocused" }
 			},
 			inputFocused: {
-				entry: [
-					assign({
-						focused: true
-					}),
-					assign({ currentInput })
-				],
+				entry: [assign({ focused: true, currentInput })],
 				on: {
 					FOCUS: { target: "inputFocused" },
 					VALIDITY_CHANGED: {
