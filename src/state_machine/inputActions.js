@@ -2,16 +2,9 @@ function changeToValidityState(event, ctx) {
 	const { send } = ctx.inputStateService;
 	const { source, validityReport } = event;
 	if (ctx.currentValidity === "valid")
-		send({
-			type: "VALID",
-			source
-		});
+		send({ type: "VALID",	source });
 	else
-		send({
-			type: "INVALID",
-			source,
-			validityReport
-		});
+		send({ type: "INVALID", source,	validityReport });
 }
 
 export const actions = {

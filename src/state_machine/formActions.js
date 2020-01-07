@@ -3,34 +3,43 @@ import { interpret } from "@xstate/fsm";
 import tippy from "tippy.js";
 import { tippyConfig } from "./tippyConf";
 
-function initializeFormInput(input, i) {
-	const {
-		form,
-		handleFocus,
-		handleInput,
-		handleBlur,
-		formStateService,
-		invalidationDelay,
-		displayMulti
-	} = this;
+function filterFormMembers(node) {
+	switch (node.nodeName) {
+		case "SELECT":
+			node.addEventListener("click", this.handleInput.bind(this));
+		case "INPUT":
+			return true
 
-	const tippyGlobalConf = { displayMulti };
-	this.setState(state => ({
-		...state,
-		[input.name]: input
-	}));
-	Object.assign(input, {
-		formStateService,
-		required: true,
-		inputIndex: i,
-		invalidationDelay
-	});
-	// @ts-ignore
-	tippy(input, tippyConfig(tippyGlobalConf));
-	input.addEventListener("input", handleInput.bind(this));
-	input.addEventListener("focus", handleFocus.bind(this));
-	input.addEventListener("blur", handleBlur.bind(this));
-	form.prepend(input);
+		default:
+			break;
+	}
+};  
+
+function initializeFormInput(input, inputIndex) {
+  const {
+    form,
+    handleFocus,
+    handleInput,
+    handleBlur,
+    formStateService,
+    invalidationDelay,
+    displayMulti
+  } = this;
+
+  const tippyGlobalConf = { displayMulti };
+  this.setState(state => ({ ...state, [input.name]: input }));
+  Object.assign(input, {
+    formStateService,
+    required: true,
+    inputIndex,
+    invalidationDelay
+  });
+  // @ts-ignore
+  tippy(input, tippyConfig(tippyGlobalConf));
+  input.addEventListener("input", handleInput.bind(this));
+  input.addEventListener("focus", handleFocus.bind(this));
+  input.addEventListener("blur", handleBlur.bind(this));
+  form.prepend(input);
 }
 export const actions = {
 	initializeForm: {
@@ -41,11 +50,9 @@ export const actions = {
 			context.formStateService = formStateService;
 			const slots = [...shadowRoot.querySelectorAll("slot")];
 			slots.forEach(slot => {
-				const nodes = slot.assignedNodes();
+				const nodes = slot.assignedNodes().reverse();
 				/**@type {Array<HTMLInputElement>} */
-				const htmlInputs = nodes.filter(
-					node => node.nodeName === "INPUT"
-				);
+				const htmlInputs = nodes.filter(filterFormMembers, tofes);
 				htmlInputs.forEach(initializeFormInput, tofes);
 			});
 		}

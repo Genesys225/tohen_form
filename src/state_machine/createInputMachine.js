@@ -32,9 +32,7 @@ export const createInputMachine = (focusedInput, displayMulti) => {
 		},
 		states: {
 			idle: {
-				on: {
-					FOCUS: "focused"
-				}
+				on: { FOCUS: "focused" }
 			},
 			focused: {
 				entry: [assign({ blurred: false, inputStateService })],

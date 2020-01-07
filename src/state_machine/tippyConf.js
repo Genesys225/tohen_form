@@ -14,10 +14,7 @@ function onShow(instance) {
 	const { dataset } = reference;
 	const { validationMessage, arrow } = dataset;
 	!displayMulti && hideAll();
-	arrow &&
-		setProps({
-			arrow
-		});
+	arrow && setProps({	arrow	});
 	setContent(validationMessage);
 	if (reference.validity.valid) return false;
 }

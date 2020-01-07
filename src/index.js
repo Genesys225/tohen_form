@@ -43,7 +43,7 @@ class Tofes extends LitElement {
 		this.name = this.getAttribute("name");
 		const formStateMachine = createFormMachine(this);
 		this.formStateService = interpret(formStateMachine).start();
-		this.formStateService.subscribe(console.trace);
+		this.formStateService.subscribe(function subscription(s) {console.trace(s)});
 	}
 
 	slotPopulated(e) {

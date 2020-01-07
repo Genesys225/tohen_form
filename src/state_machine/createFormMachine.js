@@ -52,7 +52,7 @@ export default function createFormMachine(tofes) {
 			inputFocused: {
 				entry: [assign({ focused: true, currentInput })],
 				on: {
-					FOCUS: { target: "inputFocused" },
+					FOCUS: "inputFocused",
 					VALIDITY_CHANGED: {
 						target: "inputFocused",
 						actions: actions.updateFormValidity
