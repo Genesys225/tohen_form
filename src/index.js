@@ -43,7 +43,9 @@ class Tofes extends LitElement {
 		this.name = this.getAttribute("name");
 		const formStateMachine = createFormMachine(this);
 		this.formStateService = interpret(formStateMachine).start();
-		this.formStateService.subscribe(function subscription(s) {console.trace(s)});
+		this.formStateService.subscribe(function subscription(s) {
+			console.trace(s);
+		});
 	}
 
 	slotPopulated(e) {
@@ -71,7 +73,7 @@ class Tofes extends LitElement {
 				.confirmText="${confirmText}"
 				.name=${name}
 			>
-				<slot name="input" @slotchange=${this.slotPopulated}></slot>
+				<slot @slotchange=${this.slotPopulated}></slot>
 				${showSubmit &&
 					html`
 						<button type="submit">
