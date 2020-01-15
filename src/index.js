@@ -22,8 +22,8 @@ class Tofes extends LitElement {
 		};
 	}
 
-	setState(newState) {
-		this.state = newState(this.state);
+	setState(newState, ...rest) {
+		this.state = newState(this.state, ...rest);
 	}
 
 	constructor() {

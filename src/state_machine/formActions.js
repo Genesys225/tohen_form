@@ -28,18 +28,17 @@ function initializeFormInput(input, inputIndex) {
 	const tippyGlobalConf = { displayMulti };
 	this.setState(state => ({ ...state, [input.name]: input }));
 	if (input.type === "radio") {
-		this.setState(state => {
-			let inputState = state[input.name];
-			if (!inputState[input.name]) {
-				console.trace(inputState);
-				input[input.name] = [input];
+		this.setState((state, input) => {
+			let inputName = input.name;
+			if (state[inputName] !== input) {
+				input[inputName] = [input];
+				state[inputName] = input;
 			} else {
-				console.log("PUSH", inputState[input.name]);
-				state[input.name][input.name].push(input);
+				state[inputName][inputName].push(input);
 			}
 			// node.dataset = inputState[node.name][0];
 			return state;
-		});
+		}, input);
 		return true;
 	}
 	Object.assign(input, {
@@ -62,11 +61,10 @@ export const actions = {
 			const { shadowRoot, formStateService, form } = tofes;
 			context.formStateService = formStateService;
 			const slot = shadowRoot.querySelectorAll("slot")[0];
-
-			console.trace(slot);
 			const nodes = slot.assignedNodes().reverse();
 			/**@type {Array<HTMLInputElement>} */
 			const htmlInputs = nodes.filter(filterFormMembers, tofes);
+			const inputGroups = findDuplicates(htmlInputs);
 			htmlInputs.forEach(initializeFormInput, tofes);
 			nodes.forEach(node => form.prepend(node));
 		}
@@ -104,3 +102,16 @@ export const actions = {
 		}
 	}
 };
+
+function findDuplicates(htmlInputs) {
+	const inputNames = htmlInputs.map(input => input.name).sort();
+	const duplicates = inputNames.reduce((res, input, i) => {
+		if (inputNames[i + 1] === input) {
+			res.push(input);
+		}
+		return res;
+	}, []);
+	return htmlInputs
+		.filter(input => duplicates.includes(input.name))
+		.reverse();
+}
